@@ -12,4 +12,5 @@
     <string name="hint_text">Enter city (e.g, Boston, Moscow)</string>
     <string name="read_error">Unable to read weather data</string>
     <string name="connect_error">Unable to connect to OpenWeatherMap.org</string>
+    <string name="icon_url_placeholder">http://openweathermap.org/img/w/%s.png</string>
 </resources>

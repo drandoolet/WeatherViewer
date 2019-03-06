@@ -1,5 +1,7 @@
 package com.zhopa.alina.weatherviewer;
 
+import android.content.Context;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -8,8 +10,25 @@ import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.ListView;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    private List<Weather> weatherList = new ArrayList<>();
+    private WeatherArrayAdapter weatherArrayAdapter;
+    private ListView weatherListView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,35 +37,95 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        weatherListView = findViewById(R.id.weatherListView);
+        weatherArrayAdapter = new WeatherArrayAdapter(this, weatherList);
+        weatherListView.setAdapter(weatherArrayAdapter);
+
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                EditText locationEditText = findViewById(R.id.locationEditText);
+                URL url = createURL(locationEditText.getText().toString());
+
+                if (url != null) {
+                    dismissKeyboard(locationEditText);
+                    GetWeatherTask task = new GetWeatherTask();
+                    task.execute(url);
+                } else
+                    Snackbar.make(findViewById(R.id.coordinatorLayout), R.string.invalid_url,
+                            Snackbar.LENGTH_LONG).show();
             }
         });
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    private void dismissKeyboard(View view) {
+        InputMethodManager manager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        manager.hideSoftInputFromInputMethod(view.getWindowToken(), 0);
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    private URL createURL(String city) {
+        String apiKey = getString(R.string.api_key);
+        String baseUrl = getString(R.string.web_service_url);
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        try {
+            String stringUrl = baseUrl + URLEncoder.encode(city, "UTF-8")
+                    + "&units=imperial&cnt=16&APPID=" + apiKey; // TODO: imperial - F, metric - C, standard - K, cnt - q.days
+            return new URL(stringUrl);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private class GetWeatherTask extends AsyncTask<URL, Void, JSONObject> {
+        @Override
+        protected JSONObject doInBackground(URL... params) {
+            HttpURLConnection connection = null;
+
+            try {
+                connection = (HttpURLConnection) params[0].openConnection();
+                int response = connection.getResponseCode();
+
+                if (response == HttpURLConnection.HTTP_OK) {
+                    StringBuilder builder = new StringBuilder();
+
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(connection.getInputStream()))){
+                        String line;
+
+                        while ((line = reader.readLine()) != null) {
+                            builder.append(line);
+                        }
+                    } catch (Exception e) {
+                        Snackbar.make(findViewById(R.id.coordinatorLayout), R.string.read_error,
+                                Snackbar.LENGTH_LONG).show();
+                        e.printStackTrace();
+                    }
+
+                    return new JSONObject(builder.toString());
+                } else Snackbar.make(findViewById(R.id.coordinatorLayout), R.string.connect_error,
+                        Snackbar.LENGTH_LONG).show();
+            } catch (Exception e) {
+                Snackbar.make(findViewById(R.id.coordinatorLayout), R.string.connect_error,
+                        Snackbar.LENGTH_LONG).show();
+                e.printStackTrace();
+            } finally {
+                connection.disconnect();
+            }
+
+            return null;
         }
 
-        return super.onOptionsItemSelected(item);
+        @Override
+        protected void onPostExecute(JSONObject jsonObject) {
+            convertJSONtoArrayList(jsonObject);
+            weatherArrayAdapter.notifyDataSetChanged();
+            weatherListView.smoothScrollToPosition(0);
+        }
+
+        private void convertJSONtoArrayList(JSONObject forecast) {
+
+        }
     }
 }
