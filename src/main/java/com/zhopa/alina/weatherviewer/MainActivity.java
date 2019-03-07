@@ -14,6 +14,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ListView;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -70,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             String stringUrl = baseUrl + URLEncoder.encode(city, "UTF-8")
-                    + "&units=imperial&cnt=16&APPID=" + apiKey; // TODO: imperial - F, metric - C, standard - K, cnt - q.days
+                    + "&units=imperial&cnt=5&APPID=" + apiKey; // TODO: imperial - F, metric - C, standard - K, cnt - q.days
             return new URL(stringUrl);
         } catch (Exception e) {
             e.printStackTrace();
@@ -125,7 +127,28 @@ public class MainActivity extends AppCompatActivity {
         }
 
         private void convertJSONtoArrayList(JSONObject forecast) {
+            weatherList.clear();
 
+            try {
+                JSONArray list = forecast.getJSONArray("list");
+
+                for (int i=0; i<list.length(); ++i) {
+                    JSONObject day = list.getJSONObject(i);
+                    JSONObject temperatures = day.getJSONObject("temp");
+                    JSONObject weather = day.getJSONArray("weather").getJSONObject(0);
+
+                    weatherList.add(new Weather(
+                            day.getLong("dt"),
+                            temperatures.getDouble("min"),
+                            temperatures.getDouble("max"),
+                            day.getDouble("humidity"),
+                            weather.getString("description"),
+                            getResources().getString(R.string.icon_url_placeholder, weather.getString("icon"))
+                    ));
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
