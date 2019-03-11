@@ -25,7 +25,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.TimeZone;
 
 public class MainActivity extends AppCompatActivity {
     private List<Weather> weatherList = new ArrayList<>();
@@ -72,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             String stringUrl = baseUrl + URLEncoder.encode(city, "UTF-8")
-                    + "&units=imperial&cnt=5&APPID=" + apiKey; // TODO: imperial - F, metric - C, standard - K, cnt - q.days
+                    + "&units=metric&cnt=25&APPID=" + apiKey; // imperial - F, metric - C, standard - K, cnt - q.days
             return new URL(stringUrl);
         } catch (Exception e) {
             e.printStackTrace();
@@ -130,24 +136,65 @@ public class MainActivity extends AppCompatActivity {
             weatherList.clear();
 
             try {
-                JSONArray list = forecast.getJSONArray("list");
+                if (forecast != null) {
+                    JSONArray list = forecast.getJSONArray("list");
+                    System.out.println(forecast.toString());
 
-                for (int i=0; i<list.length(); ++i) {
-                    JSONObject day = list.getJSONObject(i);
-                    JSONObject temperatures = day.getJSONObject("temp");
-                    JSONObject weather = day.getJSONArray("weather").getJSONObject(0);
+                    for (int i=0; i<list.length(); ++i) {
+                        JSONObject day = list.getJSONObject(i);
+                        JSONObject obj_main = day.getJSONObject("main");
+                        JSONObject temperatures = day.getJSONObject("main");
+                        JSONObject weather = day.getJSONArray("weather").getJSONObject(0);
+                        System.out.println("list ["+i+"] day = "+day.getLong("dt")
+                                +". "+day.getString("dt_txt"));
 
-                    weatherList.add(new Weather(
-                            day.getLong("dt"),
-                            temperatures.getDouble("min"),
-                            temperatures.getDouble("max"),
-                            day.getDouble("humidity"),
-                            weather.getString("description"),
-                            getResources().getString(R.string.icon_url_placeholder, weather.getString("icon"))
-                    ));
+                        weatherList.add(new Weather(
+                                day.getLong("dt"),
+                                temperatures.getDouble("temp_min"),
+                                temperatures.getDouble("temp_max"),
+                                temperatures.getDouble("humidity"),
+                                weather.getString("description"),
+                                getResources().getString(R.string.icon_url_placeholder, weather.getString("icon"))
+                        ));
+                    }
                 }
+
             } catch (JSONException e) {
                 e.printStackTrace();
+            }
+        }
+
+        private HashMap<Integer, Double[]> handleDailyTemperatures(JSONArray temps) {
+            int today = (int) Calendar.getInstance(TimeZone.getDefault()).getTimeInMillis() / 86400000;
+            // min max bounds in millis
+            HashMap<Long, Double> tempsMap = new HashMap<>(); // TODO check out docs for SparseArrays
+            HashMap<Integer, Double[]> dailyTempsMin = new HashMap<>();
+
+
+            for (int i=0; i<temps.length(); ++i) {
+                try {
+                    JSONObject hour = temps.getJSONObject(i);
+                    tempsMap.put(hour.getLong("dt"), hour.getDouble("temp"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    System.out.print(" at list for i="+i);
+                }
+            }
+
+            double minTemp = 0.0;
+            double maxTemp = 0.0;
+            Set<Long> tempsMapKeys = tempsMap.keySet();
+            for (int i=1; i<=5; i++) {
+                long dayStart = (today+i)*86400000;
+                long dayEnd = (today+i+1)*86400000 - 1L;
+                double[] tempsArray = {};
+                int a=0;
+                for (long key : tempsMapKeys) {
+                    if (key>=dayStart && key<=dayEnd) {
+                        tempsArray[a] = tempsMap.get(key);
+                        a++;
+                    }
+                }
             }
         }
     }
