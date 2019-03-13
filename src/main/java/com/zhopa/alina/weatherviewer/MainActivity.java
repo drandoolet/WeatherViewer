@@ -7,6 +7,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.JsonReader;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -17,6 +18,7 @@ import android.widget.ListView;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONStringer;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -139,14 +141,14 @@ public class MainActivity extends AppCompatActivity {
                 if (forecast != null) {
                     JSONArray list = forecast.getJSONArray("list");
                     System.out.println(forecast.toString());
+                    handleDailyTemperatures(list);
 
                     for (int i=0; i<list.length(); ++i) {
                         JSONObject day = list.getJSONObject(i);
-                        JSONObject obj_main = day.getJSONObject("main");
                         JSONObject temperatures = day.getJSONObject("main");
                         JSONObject weather = day.getJSONArray("weather").getJSONObject(0);
-                        System.out.println("list ["+i+"] day = "+day.getLong("dt")
-                                +". "+day.getString("dt_txt"));
+                        //System.out.println("list ["+i+"] day = "+day.getLong("dt")
+                        //        +". "+day.getString("dt_txt"));
 
                         weatherList.add(new Weather(
                                 day.getLong("dt"),
@@ -165,37 +167,45 @@ public class MainActivity extends AppCompatActivity {
         }
 
         private HashMap<Integer, Double[]> handleDailyTemperatures(JSONArray temps) {
-            int today = (int) Calendar.getInstance(TimeZone.getDefault()).getTimeInMillis() / 86400000;
+            int today = (int) (Calendar.getInstance(TimeZone.getDefault()).getTimeInMillis() / 86400000);
             // min max bounds in millis
             HashMap<Long, Double> tempsMap = new HashMap<>(); // TODO check out docs for SparseArrays
-            HashMap<Integer, Double[]> dailyTempsMin = new HashMap<>();
+            HashMap<Integer, Double[]> dailyTemps = new HashMap<>();
 
-
+            System.out.println("time in millis: "+Calendar.getInstance(TimeZone.getDefault()).getTimeInMillis());
             for (int i=0; i<temps.length(); ++i) {
                 try {
                     JSONObject hour = temps.getJSONObject(i);
-                    tempsMap.put(hour.getLong("dt"), hour.getDouble("temp"));
+                    double tempDouble = hour.getJSONObject("main").getDouble("temp");
+                    tempsMap.put(hour.getLong("dt"), tempDouble);
+                    System.out.println("tempsMap["+hour.getLong("dt")+"] = "+tempDouble);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     System.out.print(" at list for i="+i);
                 }
             }
 
-            double minTemp = 0.0;
-            double maxTemp = 0.0;
-            Set<Long> tempsMapKeys = tempsMap.keySet();
             for (int i=1; i<=5; i++) {
+                double minTemp = 0.0, maxTemp = 0.0;
                 long dayStart = (today+i)*86400000;
-                long dayEnd = (today+i+1)*86400000 - 1L;
-                double[] tempsArray = {};
-                int a=0;
-                for (long key : tempsMapKeys) {
+                long dayEnd = dayStart + 86399999;
+                System.out.println("today = "+today+"dayStart = "+dayStart+". dayEnd = "+dayEnd);
+
+                for (long key : tempsMap.keySet()) {
                     if (key>=dayStart && key<=dayEnd) {
-                        tempsArray[a] = tempsMap.get(key);
-                        a++;
+                        double test = tempsMap.get(key);
+                        minTemp = (test < minTemp ? test : minTemp);
+                        maxTemp = (test > maxTemp ? test : maxTemp);
                     }
                 }
+                dailyTemps.put(i, new Double[] {minTemp, maxTemp});
             }
+
+            for (int d=1; d<=dailyTemps.keySet().size(); d++) {
+                System.out.println("dailyTemps["+d+"] = "+Arrays.toString(dailyTemps.get(d)));
+            }
+
+            return dailyTemps;
         }
     }
 }
